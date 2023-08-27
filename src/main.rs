@@ -1,28 +1,24 @@
+pub mod line_follow;
+
 extern crate ev3dev_lang_rust;
 
+use ev3dev_lang_rust::motors::MotorPort;
 use ev3dev_lang_rust::Ev3Result;
-use ev3dev_lang_rust::motors::{LargeMotor, MotorPort};
-use ev3dev_lang_rust::sensors::ColorSensor;
+use ev3dev_lang_rust::sensors::SensorPort;
+use line_follow::{LineFollowRobot, LineFollowParameters};
 
 fn main() -> Ev3Result<()> {
 
-    // Get large motor on port outA.
-    let large_motor = LargeMotor::get(MotorPort::OutA)?;
+    let mut robot = LineFollowRobot::new(
+        SensorPort::In1, 
+        SensorPort::In2,
+        MotorPort::OutA,
+        MotorPort::OutB,
+        LineFollowParameters::new(20, 1., 100, 200)
+    )?;
+    robot.calibrate()?;
+    robot.line_follow()?;
 
-    // Set command "run-direct".
-    large_motor.run_direct()?;
-
-    // Run motor.
-    large_motor.set_duty_cycle_sp(50)?;
-
-    // Find color sensor. Always returns the first recognized one.
-    let color_sensor = ColorSensor::find()?;
-
-    // Switch to rgb mode.
-    color_sensor.set_mode_rgb_raw()?;
-
-    // Get current rgb color tuple.
-    println!("Current rgb color: {:?}", color_sensor.get_rgb()?);
 
     Ok(())
 }
