@@ -1,5 +1,5 @@
 [package]
-name = "ev3dev-lang-rust-template"
+name = "icarus"
 version = "0.1.0"
 edition = "2021"
 
