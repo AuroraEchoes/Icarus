@@ -1,19 +1,18 @@
 use std::{fmt::Display, thread::sleep, time::Duration, ops::{Add, Div}};
 
-use ev3dev_lang_rust::{Ev3Result, sensors::Sensor};
+use ev3dev_lang_rust::Ev3Result;
 
 use crate::{LineFollowRobot, Icarus};
 
 pub struct LineFollowParameters {
-    green_thresh: i32,
     kp: f32,
     tick: u64, // In ms
     targeted_speed: i32 // [0, 1]; decimal
 }
 
 impl LineFollowParameters {
-    pub fn new(green_thresh: i32, kp: f32, tick: u64, targeted_speed: i32) -> Self {
-        return Self { green_thresh, kp, tick, targeted_speed }
+    pub fn new(kp: f32, tick: u64, targeted_speed: i32) -> Self {
+        return Self { kp, tick, targeted_speed }
     }
 }
 
@@ -118,9 +117,21 @@ impl LineFollowRobot {
     }
 
     pub fn line_follow(&mut self) -> Ev3Result<()> {
+        self.ultrasonic.set_mode_us_dist_cm()?;
         if let Some(profile) = &self.calibration.clone() {
             let mut green_timeout = 0;
             loop {
+
+                // Water tower
+                // Ideally we want to make a _/‾‾‾‾\_ shape
+                let ultrasonic_reading = self.ultrasonic.get_distance_centimeters()?;
+                if ultrasonic_reading < 25. {
+                    Icarus::info("Avoiding water tower".to_string());
+                    self.avoid_water_tower()?;
+
+                }
+
+
                 let left_reading = RGB::from(self.left_light.get_rgb()?);
                 let right_reading = RGB::from(self.right_light.get_rgb()?);
 
@@ -161,9 +172,6 @@ impl LineFollowRobot {
                     self.right_motor.wait_until_not_moving(None);
                     #[cfg(target_os = "linux")]
                     self.left_motor.wait_until_not_moving(None);
-
-
-                    Icarus::debug("Green turn exited".to_string());
                     green_timeout = 0;
                 }
 
@@ -197,9 +205,6 @@ impl LineFollowRobot {
                     self.right_motor.wait_until_not_moving(None);
                     #[cfg(target_os = "linux")]
                     self.left_motor.wait_until_not_moving(None);
-
-
-                    Icarus::debug("Green turn exited".to_string());
                     green_timeout = 0;
                 }
 
@@ -244,5 +249,99 @@ impl LineFollowRobot {
         }
 
         Ok(())
+    }
+
+    pub fn avoid_water_tower(&self) -> Ev3Result<()>{
+        let pivot_rotations = 0.3;
+        let short_rotations = 1.8;
+        let long_rotations = 1.8;
+
+        
+        // Turn [_ -> /]
+        self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Move [/]
+        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
+        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
+        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Turn [/ -> ‾]
+        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Move [‾‾‾‾]
+        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * long_rotations) as i32)?;
+        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * long_rotations) as i32)?;
+        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Turn [‾ -> \]
+        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Move [\]
+        // TODO: Return to line follow here ?
+        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
+        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
+        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Turn [\ -> _]
+        self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
+        self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        return Ok(());
     }
 }
