@@ -1,28 +1,8 @@
 use std::{fmt::Display, thread::sleep, time::Duration, ops::{Add, Div}};
 
-use ev3dev_lang_rust::{sensors::{ColorSensor, SensorPort}, Ev3Result, motors::{LargeMotor, MotorPort}};
+use ev3dev_lang_rust::{Ev3Result, sensors::Sensor};
 
-pub struct LineFollowRobot {
-    left_light: ColorSensor,
-    right_light: ColorSensor,
-    left_motor: LargeMotor,
-    right_motor: LargeMotor,
-    calibration: Option<CalibrationProfile>,
-    parameters: LineFollowParameters,
-}
-
-impl LineFollowRobot {
-    pub fn new(left_light: SensorPort, right_light: SensorPort, left_motor: MotorPort, right_motor: MotorPort, params: LineFollowParameters) -> Ev3Result<Self> {
-        return Ok(Self { 
-            left_light: ColorSensor::get(left_light)?, 
-            right_light: ColorSensor::get(right_light)?, 
-            left_motor: LargeMotor::get(left_motor)?, 
-            right_motor: LargeMotor::get(right_motor)?,
-            calibration: None, 
-            parameters: params 
-        });
-    }
-}
+use crate::{LineFollowRobot, Icarus};
 
 pub struct LineFollowParameters {
     green_thresh: i32,
@@ -37,6 +17,7 @@ impl LineFollowParameters {
     }
 }
 
+#[derive(Clone)]
 pub struct CalibrationProfile {
     left: RGB,
     right: RGB,
@@ -48,6 +29,7 @@ impl From<(RGB, RGB)> for CalibrationProfile {
     }
 }
 
+#[derive(Clone)]
 pub struct RGB {
     r: i32,
     g: i32,
@@ -72,6 +54,10 @@ impl RGB {
 
     fn rb_ave(&self) -> i32 {
         return (self.r + self.b) / 2;
+    }
+
+    fn reflectivity(&self) -> f32 {
+        return 0.2125 * self.r as f32 + 0.7154 * self.g as f32 + 0.0721 * self.b as f32;
     }
 }
 
@@ -106,16 +92,17 @@ impl Div for RGB {
 impl LineFollowRobot {
     pub fn calibrate(&mut self) -> Ev3Result<()> {
         Icarus::info("Calibrating in 3 seconds".to_string());
-        sleep(Duration::from_secs(3));
         Icarus::info("Abort program to avert calibration".to_string());
-        
         self.left_light.set_mode_rgb_raw()?;
         self.right_light.set_mode_rgb_raw()?;
+        
+        sleep(Duration::from_secs(3));
 
         let mut left_rgb = RGB::from((0, 0, 0));
         let mut right_rgb = RGB::from((0, 0, 0));
 
         for _ in 0..100 {
+            sleep(Duration::from_millis(10));
             left_rgb = left_rgb.add(RGB::from(self.left_light.get_rgb()?));
             right_rgb = right_rgb.add(RGB::from(self.right_light.get_rgb()?));
         }
@@ -130,55 +117,132 @@ impl LineFollowRobot {
         Ok(())  
     }
 
-    pub fn line_follow(&self) -> Ev3Result<()> {
-        if let Some(profile) = &self.calibration {
+    pub fn line_follow(&mut self) -> Ev3Result<()> {
+        if let Some(profile) = &self.calibration.clone() {
+            let mut green_timeout = 0;
             loop {
                 let left_reading = RGB::from(self.left_light.get_rgb()?);
                 let right_reading = RGB::from(self.right_light.get_rgb()?);
+
+                let green_left = left_reading.g as f32 > 1.65 * left_reading.rb_ave() as f32;
+                let green_right = right_reading.g as f32 > 1.65 * right_reading.rb_ave() as f32;
+
+                if green_left && green_right {
+                    self.chemical_spill()?;
+                }
+
+                if green_left && green_timeout > 100 {
+                    Icarus::info(format!("Detected green turn on the left"));
+
+                    // Stop
+                    self.left_motor.stop()?;
+                    self.right_motor.stop()?;
+
+                    // Bump
+                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.left_motor.run_to_rel_pos(None)?;
+                    self.right_motor.run_to_rel_pos(None)?;
+                    #[cfg(target_os = "linux")]
+                    self.right_motor.wait_until_not_moving(None);
+                    #[cfg(target_os = "linux")]
+                    self.left_motor.wait_until_not_moving(None);
+
+                    // Turn
+                    self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
+                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
+                    self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.left_motor.run_to_rel_pos(None)?;
+                    self.right_motor.run_to_rel_pos(None)?;
+                    #[cfg(target_os = "linux")]
+                    self.right_motor.wait_until_not_moving(None);
+                    #[cfg(target_os = "linux")]
+                    self.left_motor.wait_until_not_moving(None);
+
+
+                    Icarus::debug("Green turn exited".to_string());
+                    green_timeout = 0;
+                }
+
+                if green_right && green_timeout > 100 {
+                    Icarus::info(format!("Detected green turn on the right"));
+                    
+                    // Stop
+                    self.left_motor.stop()?;
+                    self.right_motor.stop()?;
+                    
+                    // Bump
+                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.left_motor.run_to_rel_pos(None)?;
+                    self.right_motor.run_to_rel_pos(None)?;
+                    #[cfg(target_os = "linux")]
+                    self.right_motor.wait_until_not_moving(None);
+                    #[cfg(target_os = "linux")]
+                    self.left_motor.wait_until_not_moving(None);
+
+                    // Turn
+                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
+                    self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
+                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+                    self.left_motor.run_to_rel_pos(None)?;
+                    self.right_motor.run_to_rel_pos(None)?;
+                    #[cfg(target_os = "linux")]
+                    self.right_motor.wait_until_not_moving(None);
+                    #[cfg(target_os = "linux")]
+                    self.left_motor.wait_until_not_moving(None);
+
+
+                    Icarus::debug("Green turn exited".to_string());
+                    green_timeout = 0;
+                }
+
                 let (left_reading, right_reading) = RGB::calibrated((left_reading, right_reading), profile);
-                let heading = left_reading.average() - right_reading.average();
+                let heading = left_reading.reflectivity() - right_reading.reflectivity();
+                
+                // let left_motor_speed = self.parameters.targeted_speed - (heading / 100.) as i32 * self.parameters.targeted_speed;
+                // let right_motor_speed = self.parameters.targeted_speed + (heading / 100.) as i32 * self.parameters.targeted_speed;
 
-                let green_left = left_reading.g - left_reading.rb_ave() > self.parameters.green_thresh;
-                let green_right = right_reading.g - right_reading.rb_ave() > self.parameters.green_thresh;
+                let mut left_motor_speed = 
+                    (self.parameters.targeted_speed as f32) + 
+                    (
+                        (self.parameters.kp * heading / 100.) * 
+                        (self.parameters.targeted_speed as f32)
+                    );
 
-                if green_left {
-                    Icarus::debug(format!("Green left {}", left_reading));
+                let mut right_motor_speed = 
+                    (self.parameters.targeted_speed as f32) - 
+                    (
+                        (self.parameters.kp * heading / 300.) * 
+                        (self.parameters.targeted_speed as f32)
+                    );
+
+                // Guard for max speed
+                if left_motor_speed.abs() >= 800. {
+                    left_motor_speed = left_motor_speed.signum() * 800.;
+                }
+                if right_motor_speed.abs() >= 800. {
+                    right_motor_speed = right_motor_speed.signum() * 800.;
                 }
 
-                if green_right {
-                    Icarus::debug(format!("Green left {}", left_reading));
-                }
-
-                let left_motor_speed = self.parameters.targeted_speed - (heading / 100) * self.parameters.targeted_speed;
-                let right_motor_speed = self.parameters.targeted_speed + (heading / 100) * self.parameters.targeted_speed;
-
-                self.left_motor.set_speed_sp(left_motor_speed)?;
-                self.right_motor.set_speed_sp(right_motor_speed)?;
+                self.left_motor.set_speed_sp(left_motor_speed as i32)?;
+                self.right_motor.set_speed_sp(right_motor_speed as i32)?; 
                 self.left_motor.run_timed(Some(Duration::from_millis(self.parameters.tick))).unwrap();
                 self.right_motor.run_timed(Some(Duration::from_millis(self.parameters.tick))).unwrap();
-
+                
+                green_timeout += 1;
+                
             }
         } else {
             Icarus::warn("Calibration is required before line follow can be executed".to_string());
         }
 
         Ok(())
-    }
-}
-
-pub struct Icarus;
-
-// The fact that terminal colour don't work for EV3 has possibly
-// been the most devestating thing of all time for me :((
-
-impl Icarus {
-    fn info(message: String) {
-        println!("{} [{}] » {}", "(?)", "ICARUS", message);
-    }
-    fn warn(message: String) {
-        println!("{} [{}] » {}", "(!)", "ICARUS", message);
-    }
-    fn debug(message: String) {
-        println!("{} [{}] » {}", "(>)", "ICARUS", message);
     }
 }
