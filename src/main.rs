@@ -61,8 +61,8 @@ fn main() -> Ev3Result<()> {
         MotorPort::OutA,
         MotorPort::OutB,
         MotorPort::OutC,
-        LineFollowParameters::new(8., 50, 300)
-    )?;
+        LineFollowParameters::new(1., 50, 300)
+    )?; 
     robot.calibrate()?;
     robot.line_follow()?;
 

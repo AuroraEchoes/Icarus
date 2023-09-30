@@ -30,6 +30,8 @@ impl LineFollowRobot {
             if dist < 20. {
                 spotted_can = true;
             }
+            
+            // Pirouette slightly
             self.left_motor.set_speed_sp(30)?;
             self.right_motor.set_speed_sp(-30)?;
             self.left_motor.set_time_sp(100)?;
@@ -37,12 +39,9 @@ impl LineFollowRobot {
             self.left_motor.run_timed(None)?;
             self.right_motor.run_timed(None)?;
 
-
             Icarus::debug(format!("DIST: {:?}, sc: {:?}", dist, spin_count));
             spin_count += 1;
         }
-
-
 
         return Ok(());
     }

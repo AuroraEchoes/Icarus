@@ -124,89 +124,85 @@ impl LineFollowRobot {
 
                 // Water tower
                 // Ideally we want to make a _/‾‾‾‾\_ shape
-                let ultrasonic_reading = self.ultrasonic.get_distance_centimeters()?;
-                if ultrasonic_reading < 25. {
-                    Icarus::info("Avoiding water tower".to_string());
-                    self.avoid_water_tower()?;
+                // let ultrasonic_reading = self.ultrasonic.get_distance_centimeters()?;
+                // if ultrasonic_reading < 5. {
+                //     Icarus::info("Avoiding water tower".to_string());
+                //     self.avoid_water_tower()?;
 
-                }
+                // }
 
 
                 let left_reading = RGB::from(self.left_light.get_rgb()?);
                 let right_reading = RGB::from(self.right_light.get_rgb()?);
 
-                let green_left = left_reading.g as f32 > 1.65 * left_reading.rb_ave() as f32;
-                let green_right = right_reading.g as f32 > 1.65 * right_reading.rb_ave() as f32;
+                // let green_left = left_reading.g as f32 > 1.7 * left_reading.rb_ave() as f32;
+                // let green_right = right_reading.g as f32 > 1.7 * right_reading.rb_ave() as f32;
 
-                if green_left && green_right {
-                    self.chemical_spill()?;
-                }
+                // if green_left && green_timeout > 100 {
+                //     Icarus::info(format!("Detected green turn on the left {:?} margin", left_reading.g as f32 / (1.75 * left_reading.rb_ave() as f32)));
 
-                if green_left && green_timeout > 100 {
-                    Icarus::info(format!("Detected green turn on the left"));
+                //     // Stop
+                //     self.left_motor.stop()?;
+                //     self.right_motor.stop()?;
 
-                    // Stop
-                    self.left_motor.stop()?;
-                    self.right_motor.stop()?;
+                //     // Bump
+                //     self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                //     self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                //     self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                //     self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                //     self.left_motor.run_to_rel_pos(None)?;
+                //     self.right_motor.run_to_rel_pos(None)?;
+                //     #[cfg(target_os = "linux")]
+                //     self.right_motor.wait_until_not_moving(None);
+                //     #[cfg(target_os = "linux")]
+                //     self.left_motor.wait_until_not_moving(None);
 
-                    // Bump
-                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.left_motor.run_to_rel_pos(None)?;
-                    self.right_motor.run_to_rel_pos(None)?;
-                    #[cfg(target_os = "linux")]
-                    self.right_motor.wait_until_not_moving(None);
-                    #[cfg(target_os = "linux")]
-                    self.left_motor.wait_until_not_moving(None);
+                //     // Turn
+                //     self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
+                //     self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.9) as i32)?;
+                //     self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+                //     self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                //     self.left_motor.run_to_rel_pos(None)?;
+                //     self.right_motor.run_to_rel_pos(None)?;
+                //     #[cfg(target_os = "linux")]
+                //     self.right_motor.wait_until_not_moving(None);
+                //     #[cfg(target_os = "linux")]
+                //     self.left_motor.wait_until_not_moving(None);
+                //     green_timeout = 0;
+                // }
 
-                    // Turn
-                    self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
-                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
-                    self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.left_motor.run_to_rel_pos(None)?;
-                    self.right_motor.run_to_rel_pos(None)?;
-                    #[cfg(target_os = "linux")]
-                    self.right_motor.wait_until_not_moving(None);
-                    #[cfg(target_os = "linux")]
-                    self.left_motor.wait_until_not_moving(None);
-                    green_timeout = 0;
-                }
-
-                if green_right && green_timeout > 100 {
-                    Icarus::info(format!("Detected green turn on the right"));
+                // if green_right && green_timeout > 100 {
+                //     Icarus::info(format!("Detected green turn on the right {:?} margin", left_reading.g as f32 / (1.75 * left_reading.rb_ave() as f32)));
                     
-                    // Stop
-                    self.left_motor.stop()?;
-                    self.right_motor.stop()?;
+                //     // Stop
+                //     self.left_motor.stop()?;
+                //     self.right_motor.stop()?;
                     
-                    // Bump
-                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.left_motor.run_to_rel_pos(None)?;
-                    self.right_motor.run_to_rel_pos(None)?;
-                    #[cfg(target_os = "linux")]
-                    self.right_motor.wait_until_not_moving(None);
-                    #[cfg(target_os = "linux")]
-                    self.left_motor.wait_until_not_moving(None);
+                //     // Bump
+                //     self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                //     self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
+                //     self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                //     self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                //     self.left_motor.run_to_rel_pos(None)?;
+                //     self.right_motor.run_to_rel_pos(None)?;
+                //     #[cfg(target_os = "linux")]
+                //     self.right_motor.wait_until_not_moving(None);
+                //     #[cfg(target_os = "linux")]
+                //     self.left_motor.wait_until_not_moving(None);
 
-                    // Turn
-                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
-                    self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
-                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
-                    self.left_motor.run_to_rel_pos(None)?;
-                    self.right_motor.run_to_rel_pos(None)?;
-                    #[cfg(target_os = "linux")]
-                    self.right_motor.wait_until_not_moving(None);
-                    #[cfg(target_os = "linux")]
-                    self.left_motor.wait_until_not_moving(None);
-                    green_timeout = 0;
-                }
+                //     // Turn
+                //     self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.9) as i32)?;
+                //     self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
+                //     self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                //     self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+                //     self.left_motor.run_to_rel_pos(None)?;
+                //     self.right_motor.run_to_rel_pos(None)?;
+                //     #[cfg(target_os = "linux")]
+                //     self.right_motor.wait_until_not_moving(None);
+                //     #[cfg(target_os = "linux")]
+                //     self.left_motor.wait_until_not_moving(None);
+                //     green_timeout = 0;
+                // }
 
                 let (left_reading, right_reading) = RGB::calibrated((left_reading, right_reading), profile);
                 let heading = left_reading.reflectivity() - right_reading.reflectivity();
