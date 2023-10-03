@@ -64,8 +64,7 @@ fn main() -> Ev3Result<()> {
         LineFollowParameters::new(3., 50, 100, 1.7)
     )?; 
     robot.calibrate()?;
-    // robot.line_follow()?;
-    robot.roh_tah_tey();
+    robot.line_follow()?;
 
     Ok(())
 }

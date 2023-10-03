@@ -255,8 +255,8 @@ impl LineFollowRobot {
 
     pub fn avoid_water_tower(&self) -> Ev3Result<()>{
         let pivot_rotations = 0.3;
-        let short_rotations = 1.5;
-        let long_rotations = 1.2;
+        let short_rotations = 1.4;
+        let long_rotations = 0.4;
 
         
         // Turn [_ -> /]
@@ -312,6 +312,18 @@ impl LineFollowRobot {
         self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
         self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
         self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.left_motor.run_to_rel_pos(None)?;
+        self.right_motor.run_to_rel_pos(None)?;
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+
+        // Move [\]
+        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
+        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
+        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]

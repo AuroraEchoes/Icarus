@@ -27,15 +27,25 @@ impl LineFollowRobot {
     }
 
     pub fn roh_tah_tey(&self) {
+
         self.left_motor.set_speed_sp(self.parameters.targeted_speed).unwrap();
         self.right_motor.set_speed_sp(self.parameters.targeted_speed).unwrap();
         self.left_motor.set_position(0).unwrap();
         self.right_motor.set_position(0).unwrap();
-        loop {
-            println!("Positions: L — {:?} / R — {:?}", self.left_motor.get_position(), self.right_motor.get_position());
-            self.left_motor.run_to_rel_pos(Some(1)).unwrap();
-            self.right_motor.run_to_rel_pos(Some(-1)).unwrap();
-        }
+
+        self.left_motor.run_to_rel_pos(Some((2.8 * self.left_motor.get_count_per_rot().unwrap() as f32) as i32)).unwrap();
+        self.right_motor.run_to_rel_pos(Some((-2.8 * self.right_motor.get_count_per_rot().unwrap() as f32) as i32)).unwrap();
+        #[cfg(target_os = "linux")]
+        self.right_motor.wait_until_not_moving(None);
+        #[cfg(target_os = "linux")]
+        self.left_motor.wait_until_not_moving(None);
+        self.left_motor.stop().unwrap();
+        self.right_motor.stop().unwrap();
+        // loop {
+        //     println!("Positions: L — {:?} / R — {:?}", self.left_motor.get_position(), self.right_motor.get_position());
+        //     self.left_motor.run_to_rel_pos(Some(1)).unwrap();
+        //     self.right_motor.run_to_rel_pos(Some(-1)).unwrap();
+        // }
     }
 
     pub fn chemical_spill(&self) -> Ev3Result<()> {
