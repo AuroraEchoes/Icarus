@@ -27,14 +27,14 @@ impl Icarus {
 }
 
 pub struct LineFollowRobot {
-    left_light: ColorSensor,
-    right_light: ColorSensor,
-    ultrasonic: UltrasonicSensor,
-    left_motor: LargeMotor,
-    right_motor: LargeMotor,
-    claw_vert: LargeMotor,
-    calibration: Option<CalibrationProfile>,
-    parameters: LineFollowParameters,
+    pub left_light: ColorSensor,
+    pub right_light: ColorSensor,
+    pub ultrasonic: UltrasonicSensor,
+    pub left_motor: LargeMotor,
+    pub right_motor: LargeMotor,
+    pub claw_vert: LargeMotor,
+    pub calibration: Option<CalibrationProfile>,
+    pub parameters: LineFollowParameters,
 }
 
 impl LineFollowRobot {
@@ -61,10 +61,11 @@ fn main() -> Ev3Result<()> {
         MotorPort::OutA,
         MotorPort::OutB,
         MotorPort::OutC,
-        LineFollowParameters::new(1., 50, 300)
+        LineFollowParameters::new(3., 50, 100, 1.7)
     )?; 
     robot.calibrate()?;
-    robot.line_follow()?;
+    // robot.line_follow()?;
+    robot.roh_tah_tey();
 
     Ok(())
 }
