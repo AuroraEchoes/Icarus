@@ -22,30 +22,47 @@ impl LineFollowRobot {
                 detected_objects.push(rot);
             }
         }
-
+        
         return Ok(detected_objects);
     }
 
+    fn pickup_can(&self) -> Ev3Result<()> {
+        if self.ultrasonic.get_distance_centimeters()? < 30. {
+            self.ultrasonic.set_mode_us_dist_cm()?;
+            println!("Chasing can");
+            while self.ultrasonic.get_distance_centimeters()? > 10. {
+                // Move fowards
+                self.left_motor.set_time_sp(100)?;
+                self.right_motor.set_time_sp(100)?;
+                self.left_motor.set_speed_sp(self.parameters.targeted_speed / 3)?;
+                self.right_motor.set_speed_sp(self.parameters.targeted_speed / 3)?;
+                self.left_motor.run_timed(None)?;
+                self.right_motor.run_timed(None)?;
+            }
+
+            // Move claw into down position
+            self.claw_vert.run_to_rel_pos(Some((0.25 * self.claw_vert.get_count_per_rot()? as f32) as i32))?;
+            // Close
+            self.claw_horiz.run_to_rel_pos(Some((1. * self.claw_horiz.get_count_per_rot()? as f32) as i32))?;
+            // Pickup
+            self.claw_vert.run_to_rel_pos(Some((-0.25 * self.claw_vert.get_count_per_rot()? as f32) as i32))?;
+            // Reverse (example)
+            self.left_motor.set_time_sp(100)?;
+            self.right_motor.set_time_sp(100)?;
+            self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+            self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+            self.left_motor.run_timed(None)?;
+            self.right_motor.run_timed(None)?;
+
+        }
+
+        Ok(())
+    }
+
     pub fn roh_tah_tey(&self) {
-
-        self.left_motor.set_speed_sp(self.parameters.targeted_speed).unwrap();
-        self.right_motor.set_speed_sp(self.parameters.targeted_speed).unwrap();
-        self.left_motor.set_position(0).unwrap();
-        self.right_motor.set_position(0).unwrap();
-
-        self.left_motor.run_to_rel_pos(Some((2.8 * self.left_motor.get_count_per_rot().unwrap() as f32) as i32)).unwrap();
-        self.right_motor.run_to_rel_pos(Some((-2.8 * self.right_motor.get_count_per_rot().unwrap() as f32) as i32)).unwrap();
-        #[cfg(target_os = "linux")]
-        self.right_motor.wait_until_not_moving(None);
-        #[cfg(target_os = "linux")]
-        self.left_motor.wait_until_not_moving(None);
-        self.left_motor.stop().unwrap();
-        self.right_motor.stop().unwrap();
-        // loop {
-        //     println!("Positions: L — {:?} / R — {:?}", self.left_motor.get_position(), self.right_motor.get_position());
-        //     self.left_motor.run_to_rel_pos(Some(1)).unwrap();
-        //     self.right_motor.run_to_rel_pos(Some(-1)).unwrap();
-        // }
+        loop {
+            self.pickup_can().unwrap();
+        }
     }
 
     pub fn chemical_spill(&self) -> Ev3Result<()> {
