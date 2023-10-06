@@ -1,8 +1,13 @@
-use std::{fmt::Display, thread::sleep, time::Duration, ops::{Add, Div}};
+use std::{
+    fmt::Display,
+    ops::{Add, Div},
+    thread::sleep,
+    time::Duration,
+};
 
 use ev3dev_lang_rust::Ev3Result;
 
-use crate::{LineFollowRobot, Icarus};
+use crate::{Icarus, LineFollowRobot};
 
 pub struct LineFollowParameters {
     pub kp: f32,
@@ -13,7 +18,12 @@ pub struct LineFollowParameters {
 
 impl LineFollowParameters {
     pub fn new(kp: f32, tick: u64, targeted_speed: i32, green_threshold: f32) -> Self {
-        return Self { kp, tick, targeted_speed, green_threshold }
+        return Self {
+            kp,
+            tick,
+            targeted_speed,
+            green_threshold,
+        };
     }
 }
 
@@ -25,7 +35,10 @@ pub struct CalibrationProfile {
 
 impl From<(RGB, RGB)> for CalibrationProfile {
     fn from(value: (RGB, RGB)) -> Self {
-        return Self { left: value.0, right: value.1 };
+        return Self {
+            left: value.0,
+            right: value.1,
+        };
     }
 }
 
@@ -68,13 +81,25 @@ impl RGB {
 
 impl From<(i32, i32, i32)> for RGB {
     fn from(value: (i32, i32, i32)) -> Self {
-        return Self { r: value.0, g: value.1, b: value.2 };
+        return Self {
+            r: value.0,
+            g: value.1,
+            b: value.2,
+        };
     }
 }
 
 impl Display for RGB {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        return f.write_str(format!("R: {}, G: {}, B: {}", self.r.to_string(), self.g.to_string(), self.b.to_string()).as_str());
+        return f.write_str(
+            format!(
+                "R: {}, G: {}, B: {}",
+                self.r.to_string(),
+                self.g.to_string(),
+                self.b.to_string()
+            )
+            .as_str(),
+        );
     }
 }
 
@@ -82,15 +107,23 @@ impl Add for RGB {
     type Output = RGB;
 
     fn add(self, rhs: Self) -> Self::Output {
-        return Self { r: self.r + rhs.r, g: self.g + rhs.g, b: self.b + rhs.b };
+        return Self {
+            r: self.r + rhs.r,
+            g: self.g + rhs.g,
+            b: self.b + rhs.b,
+        };
     }
-} 
+}
 
 impl Div for RGB {
     type Output = RGB;
 
     fn div(self, rhs: Self) -> Self::Output {
-        return Self { r: self.r / rhs.r, g: self.g / rhs.g, b: self.b / rhs.b };
+        return Self {
+            r: self.r / rhs.r,
+            g: self.g / rhs.g,
+            b: self.b / rhs.b,
+        };
     }
 }
 
@@ -100,7 +133,7 @@ impl LineFollowRobot {
         Icarus::info("Abort program to avert calibration".to_string());
         self.left_light.set_mode_rgb_raw()?;
         self.right_light.set_mode_rgb_raw()?;
-        
+
         sleep(Duration::from_secs(3));
 
         let mut left_rgb = RGB::from((0, 0, 0));
@@ -116,10 +149,13 @@ impl LineFollowRobot {
         right_rgb = right_rgb.div(RGB::from((100, 100, 100)));
 
         let calibration = CalibrationProfile::from((left_rgb, right_rgb));
-        Icarus::info(format!("Calibration completed! Left: {}, Right: {}", calibration.left, calibration.right));
+        Icarus::info(format!(
+            "Calibration completed! Left: {}, Right: {}",
+            calibration.left, calibration.right
+        ));
         self.calibration = Some(calibration);
 
-        Ok(())  
+        Ok(())
     }
 
     pub fn line_follow(&mut self) -> Ev3Result<()> {
@@ -127,35 +163,45 @@ impl LineFollowRobot {
         if let Some(profile) = &self.calibration.clone() {
             let mut green_timeout = 0;
             loop {
-
                 // Water tower
                 // Ideally we want to make a _/‾‾‾‾\_ shape
                 let ultrasonic_reading = self.ultrasonic.get_distance_centimeters()?;
                 if ultrasonic_reading < 15. {
                     Icarus::info("Avoiding water tower".to_string());
                     self.avoid_water_tower()?;
-
                 }
-
 
                 let left_reading = RGB::from(self.left_light.get_rgb()?);
                 let right_reading = RGB::from(self.right_light.get_rgb()?);
 
-                let green_left = left_reading.g as f32 > self.parameters.green_threshold * left_reading.rb_ave() as f32;
-                let green_right = right_reading.g as f32 > self.parameters.green_threshold * right_reading.rb_ave() as f32;
+                let green_left = left_reading.g as f32
+                    > self.parameters.green_threshold * left_reading.rb_ave() as f32;
+                let green_right = right_reading.g as f32
+                    > self.parameters.green_threshold * right_reading.rb_ave() as f32;
+
+                let bump_rotations = 0.8;
 
                 if green_left && green_timeout > 100 {
-                    Icarus::info(format!("Detected green turn on the left {:?} margin", left_reading.g as f32 / (1.75 * left_reading.rb_ave() as f32)));
+                    Icarus::info(format!(
+                        "Detected green turn on the left {:?} margin",
+                        left_reading.g as f32 / (1.75 * left_reading.rb_ave() as f32)
+                    ));
 
                     // Stop
                     self.left_motor.stop()?;
                     self.right_motor.stop()?;
 
                     // Bump
-                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.left_motor.set_position_sp(
+                        (self.left_motor.get_count_per_rot()? as f32 * bump_rotations) as i32,
+                    )?;
+                    self.right_motor.set_position_sp(
+                        (self.right_motor.get_count_per_rot()? as f32 * bump_rotations) as i32,
+                    )?;
+                    self.left_motor
+                        .set_speed_sp(self.parameters.targeted_speed)?;
+                    self.right_motor
+                        .set_speed_sp(self.parameters.targeted_speed)?;
                     self.left_motor.run_to_rel_pos(None)?;
                     self.right_motor.run_to_rel_pos(None)?;
                     #[cfg(target_os = "linux")]
@@ -164,10 +210,16 @@ impl LineFollowRobot {
                     self.left_motor.wait_until_not_moving(None);
 
                     // Turn
-                    self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
-                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.9) as i32)?;
-                    self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.left_motor.set_position_sp(
+                        -(self.left_motor.get_count_per_rot()? as f32 * 0.5) as i32,
+                    )?;
+                    self.right_motor.set_position_sp(
+                        (self.right_motor.get_count_per_rot()? as f32 * 0.9) as i32,
+                    )?;
+                    self.left_motor
+                        .set_speed_sp(-self.parameters.targeted_speed)?;
+                    self.right_motor
+                        .set_speed_sp(self.parameters.targeted_speed)?;
                     self.left_motor.run_to_rel_pos(None)?;
                     self.right_motor.run_to_rel_pos(None)?;
                     #[cfg(target_os = "linux")]
@@ -178,17 +230,26 @@ impl LineFollowRobot {
                 }
 
                 if green_right && green_timeout > 100 {
-                    Icarus::info(format!("Detected green turn on the right {:?} margin", left_reading.g as f32 / (1.75 * left_reading.rb_ave() as f32)));
-                    
+                    Icarus::info(format!(
+                        "Detected green turn on the right {:?} margin",
+                        left_reading.g as f32 / (1.75 * left_reading.rb_ave() as f32)
+                    ));
+
                     // Stop
                     self.left_motor.stop()?;
                     self.right_motor.stop()?;
-                    
+
                     // Bump
-                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * 0.3) as i32)?;
-                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+                    self.left_motor.set_position_sp(
+                        (self.left_motor.get_count_per_rot()? as f32 * bump_rotations) as i32,
+                    )?;
+                    self.right_motor.set_position_sp(
+                        (self.right_motor.get_count_per_rot()? as f32 * bump_rotations) as i32,
+                    )?;
+                    self.left_motor
+                        .set_speed_sp(self.parameters.targeted_speed)?;
+                    self.right_motor
+                        .set_speed_sp(self.parameters.targeted_speed)?;
                     self.left_motor.run_to_rel_pos(None)?;
                     self.right_motor.run_to_rel_pos(None)?;
                     #[cfg(target_os = "linux")]
@@ -197,10 +258,16 @@ impl LineFollowRobot {
                     self.left_motor.wait_until_not_moving(None);
 
                     // Turn
-                    self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * 0.9) as i32)?;
-                    self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32)?;
-                    self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-                    self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+                    self.left_motor.set_position_sp(
+                        (self.left_motor.get_count_per_rot()? as f32 * 0.9) as i32,
+                    )?;
+                    self.right_motor.set_position_sp(
+                        -(self.right_motor.get_count_per_rot()? as f32 * 0.5) as i32,
+                    )?;
+                    self.left_motor
+                        .set_speed_sp(self.parameters.targeted_speed)?;
+                    self.right_motor
+                        .set_speed_sp(-self.parameters.targeted_speed)?;
                     self.left_motor.run_to_rel_pos(None)?;
                     self.right_motor.run_to_rel_pos(None)?;
                     #[cfg(target_os = "linux")]
@@ -210,25 +277,20 @@ impl LineFollowRobot {
                     green_timeout = 0;
                 }
 
-                let (left_reading, right_reading) = RGB::calibrated((left_reading, right_reading), profile);
+                let (left_reading, right_reading) =
+                    RGB::calibrated((left_reading, right_reading), profile);
                 let heading = left_reading.reflectivity() - right_reading.reflectivity();
-                
+
                 // let left_motor_speed = self.parameters.targeted_speed - (heading / 100.) as i32 * self.parameters.targeted_speed;
                 // let right_motor_speed = self.parameters.targeted_speed + (heading / 100.) as i32 * self.parameters.targeted_speed;
 
-                let mut left_motor_speed = 
-                    (self.parameters.targeted_speed as f32) + 
-                    (
-                        (self.parameters.kp * heading / 100.) * 
-                        (self.parameters.targeted_speed as f32)
-                    );
+                let mut left_motor_speed = (self.parameters.targeted_speed as f32)
+                    + ((self.parameters.kp * heading / 100.)
+                        * (self.parameters.targeted_speed as f32));
 
-                let mut right_motor_speed = 
-                    (self.parameters.targeted_speed as f32) - 
-                    (
-                        (self.parameters.kp * heading / 300.) * 
-                        (self.parameters.targeted_speed as f32)
-                    );
+                let mut right_motor_speed = (self.parameters.targeted_speed as f32)
+                    - ((self.parameters.kp * heading / 300.)
+                        * (self.parameters.targeted_speed as f32));
 
                 // Guard for max speed
                 if left_motor_speed.abs() >= 800. {
@@ -239,12 +301,15 @@ impl LineFollowRobot {
                 }
 
                 self.left_motor.set_speed_sp(left_motor_speed as i32)?;
-                self.right_motor.set_speed_sp(right_motor_speed as i32)?; 
-                self.left_motor.run_timed(Some(Duration::from_millis(self.parameters.tick))).unwrap();
-                self.right_motor.run_timed(Some(Duration::from_millis(self.parameters.tick))).unwrap();
-                
+                self.right_motor.set_speed_sp(right_motor_speed as i32)?;
+                self.left_motor
+                    .run_timed(Some(Duration::from_millis(self.parameters.tick)))
+                    .unwrap();
+                self.right_motor
+                    .run_timed(Some(Duration::from_millis(self.parameters.tick)))
+                    .unwrap();
+
                 green_timeout += 1;
-                
             }
         } else {
             Icarus::warn("Calibration is required before line follow can be executed".to_string());
@@ -253,17 +318,22 @@ impl LineFollowRobot {
         Ok(())
     }
 
-    pub fn avoid_water_tower(&self) -> Ev3Result<()>{
+    pub fn avoid_water_tower(&self) -> Ev3Result<()> {
         let pivot_rotations = 0.3;
         let short_rotations = 1.4;
         let long_rotations = 0.4;
 
-        
         // Turn [_ -> /]
-        self.left_motor.set_position_sp(-(self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
-        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
-        self.left_motor.set_speed_sp(-self.parameters.targeted_speed)?;
-        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.set_position_sp(
+            -(self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32,
+        )?;
+        self.right_motor.set_position_sp(
+            (self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32,
+        )?;
+        self.left_motor
+            .set_speed_sp(-self.parameters.targeted_speed)?;
+        self.right_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]
@@ -272,10 +342,16 @@ impl LineFollowRobot {
         self.left_motor.wait_until_not_moving(None);
 
         // Move [/]
-        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
-        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
-        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.set_position_sp(
+            (self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32,
+        )?;
+        self.right_motor.set_position_sp(
+            (self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32,
+        )?;
+        self.left_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]
@@ -284,10 +360,16 @@ impl LineFollowRobot {
         self.left_motor.wait_until_not_moving(None);
 
         // Turn [/ -> ‾]
-        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
-        self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
-        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-        self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.left_motor.set_position_sp(
+            (self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32,
+        )?;
+        self.right_motor.set_position_sp(
+            -(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32,
+        )?;
+        self.left_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor
+            .set_speed_sp(-self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]
@@ -296,10 +378,16 @@ impl LineFollowRobot {
         self.left_motor.wait_until_not_moving(None);
 
         // Move [‾‾‾‾]
-        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * long_rotations) as i32)?;
-        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * long_rotations) as i32)?;
-        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.set_position_sp(
+            (self.left_motor.get_count_per_rot()? as f32 * long_rotations) as i32,
+        )?;
+        self.right_motor.set_position_sp(
+            (self.right_motor.get_count_per_rot()? as f32 * long_rotations) as i32,
+        )?;
+        self.left_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]
@@ -308,10 +396,16 @@ impl LineFollowRobot {
         self.left_motor.wait_until_not_moving(None);
 
         // Turn [‾ -> \]
-        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
-        self.right_motor.set_position_sp(-(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32)?;
-        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-        self.right_motor.set_speed_sp(-self.parameters.targeted_speed)?;
+        self.left_motor.set_position_sp(
+            (self.left_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32,
+        )?;
+        self.right_motor.set_position_sp(
+            -(self.right_motor.get_count_per_rot()? as f32 * pivot_rotations) as i32,
+        )?;
+        self.left_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor
+            .set_speed_sp(-self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]
@@ -320,10 +414,16 @@ impl LineFollowRobot {
         self.left_motor.wait_until_not_moving(None);
 
         // Move [\]
-        self.left_motor.set_position_sp((self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
-        self.right_motor.set_position_sp((self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32)?;
-        self.left_motor.set_speed_sp(self.parameters.targeted_speed)?;
-        self.right_motor.set_speed_sp(self.parameters.targeted_speed)?;
+        self.left_motor.set_position_sp(
+            (self.left_motor.get_count_per_rot()? as f32 * short_rotations) as i32,
+        )?;
+        self.right_motor.set_position_sp(
+            (self.right_motor.get_count_per_rot()? as f32 * short_rotations) as i32,
+        )?;
+        self.left_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
+        self.right_motor
+            .set_speed_sp(self.parameters.targeted_speed)?;
         self.left_motor.run_to_rel_pos(None)?;
         self.right_motor.run_to_rel_pos(None)?;
         #[cfg(target_os = "linux")]
